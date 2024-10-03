@@ -18,3 +18,7 @@ endif
 ifdef CONFIG_ENABLE_EMULATION_HOSTFS
 	SRCS += fs/hostfs.asm
 endif
+
+ifdef CONFIG_KERNEL_ENABLE_FAT16_SUPPORT
+	SRCS += fs/fat16.asm
+endif

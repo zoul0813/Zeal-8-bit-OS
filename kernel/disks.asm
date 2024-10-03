@@ -11,6 +11,7 @@
         INCLUDE "fs/rawtable_h.asm"
         INCLUDE "fs/zealfs_h.asm"
         INCLUDE "fs/hostfs_h.asm"
+        INCLUDE "fs/fat16_h.asm"
         INCLUDE "log_h.asm"
 
         SECTION KERNEL_TEXT
@@ -1313,15 +1314,6 @@ zos_disk_rm:
 
 
         ; Private stub used when a file system is disabled from the menuconfig
-zos_fs_fat16_open:
-zos_fs_fat16_stat:
-zos_fs_fat16_read:
-zos_fs_fat16_close:
-zos_fs_fat16_write:
-zos_fs_fat16_opendir:
-zos_fs_fat16_readdir:
-zos_fs_fat16_mkdir:
-zos_fs_fat16_rm:
 zos_disk_fs_not_supported:
         ld a, ERR_NOT_SUPPORTED
         ret

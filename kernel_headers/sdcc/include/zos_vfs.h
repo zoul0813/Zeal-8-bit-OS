@@ -111,6 +111,7 @@ typedef enum {
 typedef enum {
     FS_RAWTABLE = 0,
     FS_ZEALFS   = 1,
+    FS_FAT16    = 2,
 } zos_fs_t;
 
 /**

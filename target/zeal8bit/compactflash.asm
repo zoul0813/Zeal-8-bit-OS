@@ -13,7 +13,7 @@
 
     EXTERN byte_to_ascii
 
-    DEFC CF_DISK_LETTER = 'C'
+    DEFC CF_DISK_LETTER = 'F'
 
     SECTION KERNEL_DRV_TEXT
 cf_init:
@@ -54,7 +54,7 @@ cf_ready:
     jr nz, _cf_init_not_compatible
     ; Put disk letter in A, file system in E (rawtable) and driver structure in HL
     ld a, CF_DISK_LETTER
-    ld e, FS_RAWTABLE
+    ld e, FS_FAT16
     ld hl, _cf_driver
     call zos_disks_mount
     ; A has the status, return it if error
