@@ -17,81 +17,106 @@
     SECTION KERNEL_TEXT
 
 
-_not_compatible: DEFM "CompactFlash: unsupported\n", 0
-
+;   DEFC's
     DEFC FILENAME_LEN           = 8
     DEFC EXTENSION_LEN          = 3
     DEFC MAX_BUFFER_SIZE        = 32768
 
     ; File Attributes
-    DEFC FILE_ATTR_READONLY     = 0x01
-    DEFC FILE_ATTR_HIDDEN       = 0x02
-    DEFC FILE_ATTR_SYSTEM       = 0x04
-    DEFC FILE_ATTR_VOLUME       = 0x08
-    DEFC FILE_ATTR_DIRECTORY    = 0x10
-    DEFC FILE_ATTR_ARCHIVE      = 0x20
+    DEFC FILE_ATTR_READONLY     = 0
+    DEFC FILE_ATTR_HIDDEN       = 1
+    DEFC FILE_ATTR_SYSTEM       = 2
+    DEFC FILE_ATTR_VOLUME       = 3
+    DEFC FILE_ATTR_DIRECTORY    = 4
+    DEFC FILE_ATTR_ARCHIVE      = 5
+    ;;;; bits 6-7 reserved
 
-    ; FAT16 Boot Sector
-    DEFVARS 0 {
-        fat16_bootstrapJump             DS.B 3      ; 0000h Code to jump to the bootstrap code.
-        fat16_oemId                     DS.B 8      ; 0003h Oem ID 1 - Name of the formatting OS
-        fat16_bytesPerSector            DS.B 2      ; 000Bh Bytes per Sector
-        fat16_sectorsPerCluster         DS.B 1      ; 000Dh Sectors per Cluster - Usual there is 512 bytes per sector.
-        fat16_reservedSectors           DS.B 2      ; 000Eh Reserved sectors from the start of the volume.
-        fat16_numberOfFat               DS.B 1      ; 0010h Number of FAT copies - Usual 2 copies are used to prevent data loss.
-        fat16_numberOfRoot              DS.B 2      ; 0011h Number of possible root entries - 512 entries are recommended.
-        fat16_smallSectors              DS.B 2      ; 0013h Small number of sectors - Used when volume size is less than 32 Mb.
-        fat16_mediaDescriptor           DS.B 1      ; 0015h Media Descriptor
-        fat16_sectorsPerFat             DS.B 2      ; 0016h Sectors per FAT
-        fat16_sectorsPerTrack           DS.B 2      ; 0018h Sectors per Track
-        fat16_numberOfHeads             DS.B 2      ; 001Ah Number of Heads
-        fat16_hiddenSectors             DS.B 4      ; 001Ch Hidden Sectors
-        fat16_largeSectors              DS.B 4      ; 0020h Large number of sectors - Used when volume size is greater than 32 Mb.
-        fat16_driveNumber               DS.B 1      ; 0024h Drive Number - Used by some bootstrap code, fx. MS-DOS.
-        fat16_reserved                  DS.B 1      ; 0025h Reserved - Is used by Windows NT to decide if it shall check disk integrity.
-        fat16_extendedBootSignature     DS.B 1      ; 0026h Extended Boot Signature - Indicates that the next three fields are available.
-        fat16_volumeSerial              DS.B 4      ; 0027h Volume Serial Number
-        fat16_volumeLabel               DS.B 11     ; 002Bh Volume Label - Should be the same as in the root directory.
-        fat16_fsType                    DS.B 8      ; 0036h File System Type - The string should be 'FAT16 '
-        fat16_bootstrapCode             DS.B 448    ; 003Eh Bootstrap code - May schrink in the future.
-        fat16_bootSectorSignature       DS.B 2      ; 01FEh Boot sector signature - This is the AA55h signature.
-        fat16_bootSector_end            DS.B 0      ; end of bootSector
-    }
+    ; struct_bootSector - FAT16 Boot Sector
+    DEFC BOOTSECTOR_START                     = 0x0000  ; of bootSector
+    DEFC BOOTSECTOR_BOOTSTRAPJUMP             = 0x0000  ; Code to jump to the bootstrap code.
+    DEFC BOOTSECTOR_OEMID                     = 0x0003  ; Oem ID 1 - Name of the formatting OS
+    DEFC BOOTSECTOR_BYTESPERSECTOR            = 0x000B  ; Bytes per Sector
+    DEFC BOOTSECTOR_SECTORSPERCLUSTER         = 0x000D  ; Sectors per Cluster - Usual there is 512 bytes per sector.
+    DEFC BOOTSECTOR_RESERVEDSECTORS           = 0x000E  ; Reserved sectors from the start of the volume.
+    DEFC BOOTSECTOR_NUMBEROFFAT               = 0x0010  ; Number of FAT copies - Usual 2 copies are used to prevent data loss.
+    DEFC BOOTSECTOR_NUMBEROFROOT              = 0x0011  ; Number of possible root entries - 512 entries are recommended.
+    DEFC BOOTSECTOR_SMALLSECTORS              = 0x0013  ; Small number of sectors - Used when volume size is less than 32 Mb.
+    DEFC BOOTSECTOR_MEDIADESCRIPTOR           = 0x0015  ; Media Descriptor
+    DEFC BOOTSECTOR_SECTORSPERFAT             = 0x0016  ; Sectors per FAT
+    DEFC BOOTSECTOR_SECTORSPERTRACK           = 0x0018  ; Sectors per Track
+    DEFC BOOTSECTOR_NUMBEROFHEADS             = 0x001A  ; Number of Heads
+    DEFC BOOTSECTOR_HIDDENSECTORS             = 0x001C  ; Hidden Sectors
+    DEFC BOOTSECTOR_LARGESECTORS              = 0x0020  ; Large number of sectors - Used when volume size is greater than 32 Mb.
+    DEFC BOOTSECTOR_DRIVENUMBER               = 0x0024  ; Drive Number - Used by some bootstrap code, fx. MS-DOS.
+    DEFC BOOTSECTOR_RESERVED                  = 0x0025  ; Reserved - Is used by Windows NT to decide if it shall check disk integrity.
+    DEFC BOOTSECTOR_EXTENDEDBOOTSIGNATURE     = 0x0026  ; Extended Boot Signature - Indicates that the next three fields are available.
+    DEFC BOOTSECTOR_VOLUMESERIAL              = 0x0027  ; Volume Serial Number
+    DEFC BOOTSECTOR_VOLUMELABEL               = 0x002B  ; Volume Label - Should be the same as in the root directory.
+    DEFC BOOTSECTOR_FSTYPE                    = 0x0036  ; File System Type - The string should be 'FAT16 '
+    DEFC BOOTSECTOR_BOOTSTRAPCODE             = 0x003E  ; Bootstrap code - May schrink in the future.
+    DEFC BOOTSECTOR_BOOTSECTORSIGNATURE       = 0x01FE  ; Boot sector signature - This is the AA55h signature.
+    DEFC BOOTSECTOR_END                       = 0x0200  ; of bootSector
+    ; /struct_bootSector
+;
+    ; struct_Disk
+fat16_disk_start:                     DS 0, 0xFF                  ; start of disk
+fat16_disk_fd:                        DS 1, 0x00                  ; file descriptor
+fat16_disk_bytesPerSector:            DS 2, 0x00                  ; bytes per sector
+fat16_disk_sectorsPerCluster:         DS 1, 0x00                  ; sectors per cluster
+fat16_disk_reservedSectors:           DS 2, 0x00
+fat16_disk_numberOfFat:               DS 1, 0x00
+fat16_disk_sectorsPerFat:             DS 2, 0x00
+fat16_disk_rootSector:                DS 4, 0x00                  ; root sector
+fat16_disk_bytesPerCluster:           DS 4, 0x00                  ; bytes per cluster
+fat16_disk_end:                       DS 0, 0xFF                  ; end of disk
+    ; /struct_Disk
+;
+    ; struct_directoryEntry
+fat16_entry_start:                    DS 0, 0xFF                  ; start of directory entry
+fat16_entry_filename:                 DS FILENAME_LEN,  0x00      ; 00h Filename
+fat16_entry_extension:                DS EXTENSION_LEN, 0x00      ; 08h Filename Extension
+fat16_entry_attributes:               DS 1, 0x00                  ; 0Bh Attribute Byte
+fat16_entry_reserved:                 DS 1, 0x00                  ; 0Ch Reserved for Windows NT
+fat16_entry_createdMs:                DS 1, 0x00                  ; 0Dh Creation - Millisecond stamp (actual 100th of a second)
+fat16_entry_createdTime:              DS 2, 0x00                  ; 0Eh Creation Time
+fat16_entry_createdDate:              DS 2, 0x00                  ; 10h Creation Date
+fat16_entry_lastAccessDate:           DS 2, 0x00                  ; 12h Last Access Date
+fat16_entry_reserved2:                DS 2, 0x00                  ; 14h Reserved for FAT32
+fat16_entry_lastWriteTime:            DS 2, 0x00                  ; 16h Last Write Time
+fat16_entry_lasrtWriteDate:           DS 2, 0x00                  ; 18h Last Write Date
+fat16_entry_startingCluster:          DS 2, 0x00                  ; 1Ah Starting cluster
+fat16_entry_filesize:                 DS 4, 0x00                  ; 1Ch File size in bytes
+fat16_entry_end:                      DS 0, 0xFF                  ; end of directory entry
+    ; /struct_directoryEntry
+;
+    ; struct_readFile
+fat16_file_start:                     DS 0, 0xFF                  ; start of read file
+fat16_file_size:                      DS 4, 0x00                  ; size to read
+fat16_file_remaining:                 DS 4, 0x00                  ; remaining bytes
+fat16_file_total_read:                DS 4, 0x00                  ; read file index
+fat16_file_next_cluster:              DS 2, 0x00                  ; next cluster
+fat16_file_sector_address:            DS 4, 0x00                  ; sector address
+fat16_file_end:                       DS 0, 0xFF                  ; end of read file
+    ; /struct_readFile
+;
+file_buffer:                          DS 0xFF, 0x00                  ; file buffer to read data into
 
-    DEFC FAT16_BOOTSECTOR_SIZE = fat16_bootSector_end
-    ASSERT(FAT16_BOOTSECTOR_SIZE == 512)
+    MACRO ON_ERROR handler
+        or a
+        jp nz, handler
+    ENDM
 
-    DEFVARS 0 {
-        fat16_disk_rootSector                DS.Q 1      ; root sector
-        fat16_disk_sectorsPerCluster         DS.Q 1      ; sectors per cluster
-        fat16_disk_bytesPerSector            DS.Q 1      ; bytes per sector
-        fat16_disk_bytesPerCluster           DS.Q 1      ; bytes per cluster
-        fat16_disk_end                       DS.B 0      ; end of disk
-    }
+    MACRO FETCH buffer, sz
+        ld a, (fat16_disk_fd) ; disk dev
+        ; TODO: read from the current driver
+        ; S_READ3(a, buffer, sz)
+    ENDM
 
-    DEFC FAT16_DISK_SIZE = fat16_disk_end
-    ASSERT(FAT16_DISK_SIZE == 16)
+    MACRO CLEAR_CARRY
+        or a
+    ENDM
 
-    ; FAT16 DirectoryEntry
-    DEFVARS 0 {
-        fat16_entry_filename            DS.B FILENAME_LEN       ; 00h Filename
-        fat16_entry_extension           DS.B EXTENSION_LEN      ; 08h Filename Extension
-        fat16_entry_attributes          DS.B 1                  ; 0Bh Attribute Byte
-        fat16_entry_reserved            DS.B 1                  ; 0Ch Reserved for Windows NT
-        fat16_entry_createdMs           DS.B 1                  ; 0Dh Creation - Millisecond stamp (actual 100th of a second)
-        fat16_entry_createdTime         DS.B 2                  ; 0Eh Creation Time
-        fat16_entry_createdDate         DS.B 2                  ; 10h Creation Date
-        fat16_entry_lastAccessDate      DS.B 2                  ; 12h Last Access Date
-        fat16_entry_reserved2           DS.B 2                  ; 14h Reserved for FAT32
-        fat16_entry_lastWriteTime       DS.B 2                  ; 16h Last Write Time
-        fat16_entry_lasrtWriteDate      DS.B 2                  ; 18h Last Write Date
-        fat16_entry_startingCluster     DS.B 2                  ; 1Ah Starting cluster
-        fat16_entry_filesize            DS.B 4                  ; 1Ch File size in bytes
-        fat16_dirEntry_end              DS.B 0                  ; end of directory entry
-    }
 
-    DEFC FAT16_DIRENTRY_SIZE = fat16_dirEntry_end
-    ASSERT(FAT16_DIRENTRY_SIZE == 32)
 
     ; These macros points to code that will be loaded and executed within the buffer
     DEFC RAM_EXE_CODE  = _vfs_work_buffer
@@ -138,8 +163,11 @@ _not_compatible: DEFM "CompactFlash: unsupported\n", 0
     ;       A, BC, DE, HL
     PUBLIC zos_fat16_open
 zos_fat16_open:
+    ld hl, _unsupported_open
+    call zos_log_warning
     ld a, ERR_NOT_IMPLEMENTED
     ret
+;
 
 
     ; Get the stats of a file from a disk.
@@ -155,8 +183,11 @@ zos_fat16_open:
     ;       A, BC, DE, HL (Can alter any of the fields)
     PUBLIC zos_fat16_stat
 zos_fat16_stat:
+    ld hl, _unsupported_stat
+    call zos_log_warning
     ld a, ERR_NOT_IMPLEMENTED
     ret
+;
 
 
     ; Read bytes of an opened file.
@@ -180,9 +211,11 @@ zos_fat16_stat:
     ;       A, BC, DE, HL
     PUBLIC zos_fat16_read
 zos_fat16_read:
+    ld hl, _unsupported_read
+    call zos_log_warning
     ld a, ERR_NOT_IMPLEMENTED
     ret
-
+;
 
     ; Perform a write on an opened file.
     ; Parameters:
@@ -200,8 +233,11 @@ zos_fat16_read:
     ;       A, BC, DE, HL
     PUBLIC zos_fat16_write
 zos_fat16_write:
+    ld hl, _unsupported_write
+    call zos_log_warning
     ld a, ERR_NOT_IMPLEMENTED
     ret
+;
 
 
     ; Close an opened file.
@@ -214,8 +250,11 @@ zos_fat16_write:
     ;       A, BC, DE, HL
     PUBLIC zos_fat16_close
 zos_fat16_close:
+    ld hl, _unsupported_close
+    call zos_log_warning
     ld a, ERR_NOT_IMPLEMENTED
     ret
+;
 
     ; ====================== Directories related ====================== ;
 
@@ -230,6 +269,9 @@ zos_fat16_close:
     ;       A, BC, DE, HL
     PUBLIC zos_fat16_opendir
 zos_fat16_opendir:
+
+    ; call _load_boot_sector
+
     ; Treat / as a special case
     inc hl
     ld a, (hl)
@@ -237,15 +279,19 @@ zos_fat16_opendir:
     jr z, _zos_fat16_opendir_root
 
 
-    ld hl, _not_compatible
-    call zos_log_info
-    ld a, ERR_NOT_IMPLEMENTED
-    ret
-_zos_fat16_opendir_root:
-    ld hl, _not_compatible
+    ld hl, _unsupported_opendir
     call zos_log_warning
     ld a, ERR_NOT_IMPLEMENTED
     ret
+;
+
+_zos_fat16_opendir_root:
+    ld hl, _unsupported_opendir_root
+    call zos_log_warning
+    ld a, ERR_NOT_IMPLEMENTED
+    ret
+;
+
 
     ; Read the next entry from the opened directory and store it in the user's buffer.
     ; The given buffer is guaranteed to be big enough to store DISKS_DIR_ENTRY_SIZE bytes.
@@ -262,8 +308,11 @@ _zos_fat16_opendir_root:
     ;       A, BC, DE, HL (can alter any)
     PUBLIC zos_fat16_readdir
 zos_fat16_readdir:
+    ld hl, _unsupported_readdir
+    call zos_log_warning
     ld a, ERR_NOT_IMPLEMENTED
     ret
+;
 
 
     ; Create a directory on a disk.
@@ -277,9 +326,11 @@ zos_fat16_readdir:
     ;       A
     PUBLIC zos_fat16_mkdir
 zos_fat16_mkdir:
+    ld hl, _unsupported_mkdir
+    call zos_log_warning
     ld a, ERR_NOT_IMPLEMENTED
     ret
-
+;
 
     ; Remove a file or a(n empty) directory on the disk.
     ; Parameters:
@@ -292,14 +343,265 @@ zos_fat16_mkdir:
     ;       A
     PUBLIC zos_fat16_rm
 zos_fat16_rm:
+    ld hl, _unsupported_rm
+    call zos_log_warning
     ld a, ERR_NOT_IMPLEMENTED
     ret
+;
 
+zos_fat16_on_error:
+    ld a, ERR_FAILURE
+    ret
 
 zos_fat16_driver_end:
 
-; Private
+    ;======================================================================;
+    ;================= P R I V A T E   R O U T I N E S ====================;
+    ;======================================================================;
 
+    ; Load the boot sector, populate struct_Disk
+        ; Returns:
+        ; Alters:
+        ;       ???
+_load_boot_sector:
+    ld bc, 0
+    ld de, BOOTSECTOR_BYTESPERSECTOR
+    call _seek
+    ON_ERROR(zos_fat16_on_error)
+
+    ; read the OEM ID from the Boot Sector and print it out
+    FETCH(fat16_disk_bytesPerSector, 2)
+    ON_ERROR(zos_fat16_on_error)
+
+    FETCH(fat16_disk_sectorsPerCluster, 1)
+    ON_ERROR(zos_fat16_on_error)
+
+    FETCH(fat16_disk_reservedSectors, 2)
+    ON_ERROR(zos_fat16_on_error)
+
+    FETCH(fat16_disk_numberOfFat, 1)
+    ON_ERROR(zos_fat16_on_error)
+
+    ld a, (fat16_disk_fd)
+    ld h, a
+    ld bc, 0 ; skip over numberOfRoot, smallSectors, mediaDescriptor
+    ld de, 5
+    ld a, SEEK_CUR
+    ; SEEK() ; TODO: figure out how to seek in the FS driver :)
+    ON_ERROR(zos_fat16_on_error)
+
+
+    FETCH(fat16_disk_sectorsPerFat, 2)
+    ON_ERROR(zos_fat16_on_error)
+
+    ; disk->rootSector = reservedSectors + (numberOfFat * sectorsPerFat);
+    ; (numberOfFat * sectorsPerFat)
+    ld d, 0
+    ld a, (fat16_disk_numberOfFat)
+    ld e, a
+    ld bc, (fat16_disk_sectorsPerFat)
+    call _mul16
+
+    ld bc, (fat16_disk_reservedSectors)
+    add hl, bc
+    ld (fat16_disk_rootSector), hl
+    jr nc, @_nocarry
+    inc de ; carry over into high bytes
+@_nocarry:
+    ld (fat16_disk_rootSector+2), de
+
+    ; disk->bytesPerCluster = disk->sectorsPerCluster * disk->bytesPerSector;
+    ld bc, (fat16_disk_bytesPerSector)
+    ld d, 0
+    ld a, (fat16_disk_sectorsPerCluster)
+    ld e, a
+    call _mul16
+
+    ld (fat16_disk_bytesPerCluster), hl
+    ld (fat16_disk_bytesPerCluster+2), de
+
+    ret
+;
+
+    ; Seek to location on disk
+        ; Returns:
+        ;       BCDE - cluster
+        ; Alters:
+        ;       ????
+_seek:
+    ld a, (fat16_disk_fd) ; disk dev
+    ld h, a
+    ld a, SEEK_SET
+    ; SEEK() ; TODO: figure out how to seek in the FS driver :)
+    ret
+;
+
+    ; Get the sector address
+        ; Parameters
+        ;       HL - cluster
+        ; Returns:
+        ;       BCDE - address
+        ; Alters:
+        ;       ????
+_get_sector_address:
+    ; uint32_t addr = cluster;
+    ; HL
+
+    ; addr -= 2;
+    ld de, 2
+    CLEAR_CARRY
+    sbc hl, de ; HL = cluster - 2
+    ex de, hl  ; DE = cluster, HL = cluster
+
+    ; addr *= disk->sectorsPerCluster;
+    ; DE = cluster
+    ld b, 0
+    ld a, (fat16_disk_sectorsPerCluster)
+    ld c, a ; BC = sectorsPerCluster
+    call _mul16 ; DEHL
+    ; addr = DEHL
+
+    ; addr += disk->rootSector;
+    ;; copy rootSector into sector_address
+    ld bc, (fat16_disk_rootSector)
+    ld (fat16_file_sector_address), bc
+    ld bc, (fat16_disk_rootSector+2)
+    ld (fat16_file_sector_address+2), bc
+    ; fat16_file_sector_address = fat16_disk_rootSector
+
+    ;; add addr to rootSector
+    ld de, (fat16_file_sector_address)
+    add hl, de
+    ld (fat16_file_sector_address), hl
+
+    ld hl, bc
+    ld de, (fat16_file_sector_address + 2)
+    adc hl, de
+    ld (fat16_file_sector_address + 2), hl
+
+    ; addr += 32;
+    ld h, 0
+    ld l, 32
+    ld de, (fat16_file_sector_address)
+    add hl, de
+    ld (fat16_file_sector_address), hl
+
+    ld hl, (fat16_file_sector_address + 2)
+    ld de, 0
+    adc hl, de
+    ld (fat16_file_sector_address + 2), hl
+
+    ; addr *= disk->bytesPerSector;
+    ; _mul16 fat16_file_sector_address * fat16_disk_bytesPerSector
+    ld bc, (fat16_disk_bytesPerSector)
+    ld hl, (fat16_file_sector_address) ; in HL already?
+    ld de, (fat16_file_sector_address+2) ; in HL already?
+    call _mul16x32 ; BC * DEHL
+
+
+    ; store the 32-bit addr
+    ld (fat16_file_sector_address), hl
+    ld (fat16_file_sector_address+2), de
+
+
+    ; return addr;
+    ld de, (fat16_file_sector_address)
+    ld bc, (fat16_file_sector_address+2)
+    ; print the sector address
+    ; call hexPrint8 ; BCDE
+    ; S_WRITE3(DEV_STDOUT, _msg_address, _msg_address_end - _msg_address)
+    ; S_WRITE3(DEV_STDOUT, hex_buffer, 9)
+
+    ret
+;
+
+    ; Get root address
+        ; Returns
+        ;       BCDE - address
+        ; Alters:
+        ;       ????
+_get_root_address:
+    ; uint32_t addr = disk->rootSector * disk->bytesPerSector;
+    ld bc, (fat16_disk_rootSector)
+    ld de, (fat16_disk_bytesPerSector)
+    call _mul16
+    ; swap things around, _seek wants BCDE
+
+    ; return addr;
+    ld bc, de
+    ld de, hl
+
+    ret
+;
+
+    ; Multiply two 16-bit values, resulting in 32-bit
+        ; Parameters:
+        ;       BC - first number
+        ;       DE - second number
+        ; Returns:
+        ;       DEHL - BC*DE
+        ; Alters:
+        ;       A, BC, DE, HL
+_mul16:
+    ld hl, 0
+    ld a, 16
+@_loop:
+    add hl, hl
+    rl e
+    rl d
+    jp nc, @_next
+    add hl, bc
+    jp nc, @_next
+    inc de
+@_next:
+    dec a
+    jp nz, @_loop
+    ret
+;
+
+    ; Multiply a 32-bit value with a 16-bit, resulting in 32-bits
+        ; Parameters:
+        ;       BC - 16-bit value
+        ;       DEHL - 32-bit balue
+        ; Returns:
+        ;       DEHL - BC*DEHL
+        ; Alters:
+        ;       A, BC, DE, HL
+_mul16x32:
+    push hl
+    push bc
+    ; Multiply DE with BC first
+    call _mul16
+    pop bc
+    ; Get former HL in DE. We can alter DE since we only need to keep HL
+    pop de
+    ; Keep current result (HL) on the stack
+    push hl
+    call _mul16
+    ; Result in DEHL again, add DE and former DE
+    pop bc
+    ex de, hl
+    add hl, bc
+    ex de, hl
+    ret
+;
+
+    ; This routine gets the `read` function of a driver and stores it in the RAM_EXE_READ buffer.
+    ; It will in fact store a small routine that does:
+    ;       xor a   ; Set A to "FS" mode, i.e., has offset on stack
+    ;       push hl
+    ;       ld h, a
+    ;       ld l, a ; Set HL to 0
+    ;       push hl
+    ;       jp driver_read_function
+    ; As such, HL is the 16-bit offset to read from the driver, can this routine can be called
+    ; with `call RAM_EXE_READ`, no need to manually push the return address on the stack.
+    ; Parameters:
+    ;   DE - Driver address
+    ; Returns:
+    ;   HL - Address of read function
+    ; Alters:
+    ;   A, DE, HL
 zos_fat16_prepare_driver_read:
     ld hl, PUSH_HL << 8 | XOR_A
     ld (RAM_EXE_READ + 0), hl
@@ -311,3 +613,41 @@ zos_fat16_prepare_driver_read:
     GET_DRIVER_READ_FROM_DE()
     ld (RAM_EXE_READ + 6), hl
     ret
+
+
+    ; Same as above, but with write routine
+zos_fat16_prepare_driver_write:
+    ld hl, PUSH_HL << 8 | XOR_A
+    ld (RAM_EXE_WRITE + 0), hl
+    ld hl, LD_L_A << 8 | LD_H_A
+    ld (RAM_EXE_WRITE + 2), hl
+    ld hl, JP_NNNN << 8 | PUSH_HL
+    ld (RAM_EXE_WRITE + 4), hl
+    ; Retrieve driver (DE) read function address, in HL.
+    GET_DRIVER_WRITE_FROM_DE()
+    ld (RAM_EXE_WRITE + 6), hl
+    ret
+
+    ; Same as above but safe
+zos_fat16_prepare_driver_write_safe:
+    push hl
+    push de
+    call zos_fat16_prepare_driver_write
+    pop de
+    pop hl
+    ret
+
+
+
+
+;;; STRINGS
+_unsupported_open: DEFM "FAT16: open unsupported\n", 0
+_unsupported_stat: DEFM "FAT16: stat unsupported\n", 0
+_unsupported_read: DEFM "FAT16: read unsupported\n", 0
+_unsupported_write: DEFM "FAT16: write unsupported\n", 0
+_unsupported_close: DEFM "FAT16: close unsupported\n", 0
+_unsupported_opendir: DEFM "FAT16: opendir unsupported\n", 0
+_unsupported_opendir_root: DEFM "FAT16: opendir:root unsupported\n", 0
+_unsupported_readdir: DEFM "FAT16: readdir unsupported\n", 0
+_unsupported_mkdir: DEFM "FAT16: mkdir unsupported\n", 0
+_unsupported_rm: DEFM "FAT16: rm unsupported\n", 0
