@@ -9,6 +9,7 @@
     INCLUDE "vfs_h.asm"
     INCLUDE "disks_h.asm"
     INCLUDE "compactflash_h.asm"
+    INCLUDE "fs/fat16_h.asm"
     INCLUDE "log_h.asm"
 
     EXTERN byte_to_ascii
@@ -52,6 +53,11 @@ cf_ready:
     call wait_for_ready
     ; If A is not zero, 8-bit mode is not supported
     jr nz, _cf_init_not_compatible
+
+    ; TODO: detect FS and load appropriate drivers
+    call zos_fs_fat16_mount
+    jr nz, _cf_init_failed_boot_sector
+
     ; Put disk letter in A, file system in E (rawtable) and driver structure in HL
     ld a, CF_DISK_LETTER
     ld e, FS_FAT16
@@ -74,8 +80,14 @@ _cf_init_not_found:
     call zos_log_warning
     xor a
     ret
+_cf_init_failed_boot_sector:
+    ld hl, _failed_boot_sector_str
+    call zos_log_warning
+    ld a, ERR_INVALID_FILESYSTEM
+    ret
 _not_compatible: DEFM "CompactFlash: 8-bit mode unsupported\n", 0
 _not_found_str:  DEFM "No CompactFlash found\n", 0
+_failed_boot_sector_str:  DEFM "Failed to read FAT16 Boot Sector\n", 0
 
 
     ; Routine that waits for the CompactFlash to be ready and not busy.

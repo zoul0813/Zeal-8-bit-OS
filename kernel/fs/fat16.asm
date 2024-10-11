@@ -349,11 +349,18 @@ zos_fat16_rm:
     ret
 ;
 
+    PUBLIC zos_fat16_mount
+zos_fat16_mount:
+    call _load_boot_sector
+    ret;
+;
+
 zos_fat16_on_error:
     ld a, ERR_FAILURE
     ret
 
 zos_fat16_driver_end:
+;
 
     ;======================================================================;
     ;================= P R I V A T E   R O U T I N E S ====================;
@@ -366,8 +373,12 @@ zos_fat16_driver_end:
 _load_boot_sector:
     ld bc, 0
     ld de, BOOTSECTOR_BYTESPERSECTOR
-    call _seek
-    ON_ERROR(zos_fat16_on_error)
+    ; call _seek
+    ; ON_ERROR(zos_fat16_on_error)
+
+    ; TESTING - can't write to ROM, lol :)
+    ; ld hl, 0xFFFF
+    ; ld (fat16_disk_bytesPerCluster), hl
 
     ; read the OEM ID from the Boot Sector and print it out
     FETCH(fat16_disk_bytesPerSector, 2)
@@ -613,7 +624,7 @@ zos_fat16_prepare_driver_read:
     GET_DRIVER_READ_FROM_DE()
     ld (RAM_EXE_READ + 6), hl
     ret
-
+;
 
     ; Same as above, but with write routine
 zos_fat16_prepare_driver_write:
@@ -627,6 +638,7 @@ zos_fat16_prepare_driver_write:
     GET_DRIVER_WRITE_FROM_DE()
     ld (RAM_EXE_WRITE + 6), hl
     ret
+;
 
     ; Same as above but safe
 zos_fat16_prepare_driver_write_safe:
@@ -636,11 +648,13 @@ zos_fat16_prepare_driver_write_safe:
     pop de
     pop hl
     ret
+;
 
 
 
-
-;;; STRINGS
+    ;======================================================================;
+    ;=================          S T R I N G S          ====================;
+    ;======================================================================;
 _unsupported_open: DEFM "FAT16: open unsupported\n", 0
 _unsupported_stat: DEFM "FAT16: stat unsupported\n", 0
 _unsupported_read: DEFM "FAT16: read unsupported\n", 0

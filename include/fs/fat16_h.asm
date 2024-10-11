@@ -19,6 +19,7 @@
     EXTERN zos_fat16_readdir
     EXTERN zos_fat16_mkdir
     EXTERN zos_fat16_rm
+    EXTERN zos_fat16_mount
 
     DEFC zos_fs_fat16_open    = zos_fat16_open
     DEFC zos_fs_fat16_read    = zos_fat16_read
@@ -29,6 +30,7 @@
     DEFC zos_fs_fat16_close   = zos_fat16_close
     DEFC zos_fs_fat16_mkdir   = zos_fat16_mkdir
     DEFC zos_fs_fat16_rm      = zos_fat16_rm
+    DEFC zos_fs_fat16_mount   = zos_fat16_mount
 
     ELSE ; !CONFIG_KERNEL_ENABLE_fat16_SUPPORT
 
@@ -41,6 +43,7 @@
     DEFC zos_fs_fat16_close   = zos_disk_fs_not_supported
     DEFC zos_fs_fat16_mkdir   = zos_disk_fs_not_supported
     DEFC zos_fs_fat16_rm      = zos_disk_fs_not_supported
+    DEFC zos_fs_at16_mount    = zos_disk_fs_not_supported
 
     ENDIF ; CONFIG_KERNEL_ENABLE_FAT16_SUPPORT
 
