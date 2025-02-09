@@ -1,0 +1,720 @@
+/tmp/tmpcdpiG19I.asm:
+     1                          MODULE zeal8bitos_asm
+     2                          LINE 0, "/Users/david.higgins@konghq.com/Documents/Private/zeal/zeal-dev-environment/home/Zeal-8-bit-OS/kernel_headers/zcc/src/zeal8bitos.asm"
+/Users/david.higgins@konghq.com/Documents/Private/zeal/zeal-dev-environment/home/Zeal-8-bit-OS/kernel_headers/zcc/src/zeal8bitos.asm:
+                                
+     1                          SECTION code_user
+     2                          
+     3                          PUBLIC fputc_cons_native
+     4                          PUBLIC _fputc_cons_native
+     5                          
+     6                          PUBLIC fgetc_cons
+     7                          PUBLIC _fgetc_cons
+     8                          
+     9                          
+    10                          ; STD_BUFFER_SIZE=80
+    11                          
+    12                          fputc_cons_native:
+    13                          _fputc_cons_native:
+    14  0000  c1                    pop     bc  ;return address
+    15  0001  e1                    pop     hl  ;character to print in l
+    16  0002  e5                    push    hl
+    17  0003  c5                    push    bc
+    18  0004  cd0000                call _putchar
+    19  0007  c9                    ret
+    20                          
+    21                          fgetc_cons:
+    22                          _fgetc_cons:
+    23  0008  cd0000                call _getchar
+    24  000b  626b                  ld hl, de
+    25  000d  c9                    ret
+    26                          
+    27                          
+    28                          
+    29                          ; SPDX-FileCopyrightText: 2023 Zeal 8-bit Computer <contact@zeal8bit.com>
+    30                          ;
+    31                          ; SPDX-License-Identifier: Apache-2.0
+    32                          
+    33                              MACRO syscall number
+    34                                  ld l, number
+    35                                  rst 8
+    36                              ENDM
+    37                          
+    38                              ; Size of the buffers used for getchar and putchar
+    39                              STD_BUFFER_SIZE=80
+    40                          
+    41                              ; Put all the syscall glue from this file inside the _SYSTEM area/section
+    42                              ; SECTION _SYSTEM
+    43                          
+    44                              ; The following routines are written with SDCC new calling convention:
+    45                              ; __sdcccall(1).
+    46                              ; Thus, most parameters will be given in registers. Also, because the
+    47                              ; routines don't have variadic arguments and return a value less or equal
+    48                              ; to 16-bit, we will need to clean the stack.
+    49                          
+    50                              ; zos_err_t read(zos_dev_t dev, void* buf, uint16_t* size);
+    51                              ; Parameters:
+    52                              ;   A       - dev
+    53                              ;   DE      - buf
+    54                              ;   [Stack] - size*
+    55                              PUBLIC _read
+    56                          _read:
+    57                              ; We have to get the size from the pointer which is on the stack.
+    58                              ; Pop the return address and exchange with the pointer on the top.
+    59  000e  e1                    pop hl
+    60  000f  e3                    ex (sp), hl
+    61                              ; HL contains size*, top of the stack contains the return address.
+    62                              ; Dereference the size in BC
+    63  0010  4e                    ld c, (hl)
+    64  0011  23                    inc hl
+    65  0012  46                    ld b, (hl)
+    66                              ; Save back the address of size on the stack, we will use it to save
+    67                              ; the returned value (in BC)
+    68  0013  e5                    push hl
+    69                              ; Syscall parameters:
+    70                              ;   H - Opened dev
+    71                              ;   DE - Buffer source
+    72                              ;   BC - Buffer size
+    73                              ; Returns:
+    74                              ;   A - Error value
+    75                              ;   BC - Number of bytes read
+    76  0014  67                    ld h, a
+    77  0015  2e00cf                syscall 0
+    78                              ; In any case, we have to clean the stack
+    79  0018  e1                    pop hl
+    80                              ; If error returned is not ERR_SUCCESS, do not alter the given size*
+    81  0019  b7                    or a
+    82  001a  c0                    ret nz
+    83                              ; No error so far, we can fill the pointer. Note, HL points to the MSB!
+    84  001b  70                    ld (hl), b
+    85  001c  2b                    dec hl
+    86  001d  71                    ld (hl), c
+    87  001e  c9                    ret
+    88                          
+    89                          
+    90                              ; zos_err_t write(zos_dev_t dev, const void* buf, uint16_t* size);
+    91                              PUBLIC _write
+    92                          _write:
+    93                              ; This routine is exactly the same as the one above
+    94  001f  e1                    pop hl
+    95  0020  e3                    ex (sp), hl
+    96  0021  4e                    ld c, (hl)
+    97  0022  23                    inc hl
+    98  0023  46                    ld b, (hl)
+    99  0024  e5                    push hl
+   100                              ; Syscall parameters:
+   101                              ;   H - Opened dev
+   102                              ;   DE - Buffer source
+   103                              ;   BC - Buffer size
+   104                              ; Returns:
+   105                              ;   A - Error value
+   106                              ;   BC - Number of bytes written
+   107  0025  67                    ld h, a
+   108  0026  2e00cf                syscall 1
+   109  0029  e1                    pop hl
+   110  002a  b7                    or a
+   111  002b  c0                    ret nz
+   112  002c  70                    ld (hl), b
+   113  002d  2b                    dec hl
+   114  002e  71                    ld (hl), c
+   115  002f  c9                    ret
+   116                          
+   117                          
+   118                              ; int8_t open(const char* name, uint8_t flags);
+   119                              ; Parameters:
+   120                              ;   HL      - name
+   121                              ;   [Stack] - flags
+   122                              PUBLIC _open
+   123                          _open:
+   124                              ; Copy name/path in BC, as required by the syscall.
+   125  0030  44                    ld b, h
+   126  0031  4d                    ld c, l
+   127                              ; Get the flags, which are on the stack, behind the return address.
+   128                              ; We have to clean the stack.
+   129  0032  e1                    pop hl
+   130  0033  3b                    dec sp
+   131  0034  e3                    ex (sp), hl
+   132                              ; Syscall parameters:
+   133                              ;   BC - Name
+   134                              ;   H - Flags
+   135  0035  2e00cf                syscall 2
+   136  0038  c9                    ret
+   137                          
+   138                          
+   139                              ; zos_err_t close(zos_dev_t dev);
+   140                              ; Parameters:
+   141                              ;   A - dev
+   142                              PUBLIC _close
+   143                          _close:
+   144  0039  67                    ld h, a
+   145                              ; Syscall parameters:
+   146                              ;   H - dev
+   147  003a  2e00cf                syscall 3
+   148  003d  c9                    ret
+   149                          
+   150                          
+   151                              ; zos_err_t dstat(zos_dev_t dev, zos_stat_t* stat);
+   152                              ; Parameters:
+   153                              ;   A  - dev
+   154                              ;   DE - *stat
+   155                              PUBLIC _dstat
+   156                          _dstat:
+   157                              ; Syscall parameters:
+   158                              ;   H  - Opened dev
+   159                              ;   DE - File stat structure address
+   160  003e  67                    ld h, a
+   161  003f  2e00cf                syscall 4
+   162  0042  c9                    ret
+   163                          
+   164                          
+   165                              ; zos_err_t stat(const char* path, zos_stat_t* stat);
+   166                              ; Parameters:
+   167                              ;   HL - path
+   168                              ;   DE - stat
+   169                              PUBLIC _stat
+   170                          _stat:
+   171                              ; Syscall parameters:
+   172                              ;   BC - Path to file
+   173                              ;   DE - File stat structure address
+   174  0043  44                    ld b, h
+   175  0044  4d                    ld c, l
+   176  0045  2e00cf                syscall 5
+   177  0048  c9                    ret
+   178                          
+   179                          
+   180                              ; zos_err_t seek(zos_dev_t dev, int32_t* offset, zos_whence_t whence);
+   181                              ; Parameters:
+   182                              ;   A  - dev
+   183                              ;   DE - *offset
+   184                              ;   [Stack] - whence
+   185                              PUBLIC _seek
+   186                          _seek:
+   187                              ; Pop return address in HL, and exchange with whence
+   188  0049  e1                    pop hl
+   189  004a  3b                    dec sp
+   190  004b  e3                    ex (sp), hl
+   191                              ; Put the whence in A and the dev in H
+   192  004c  6f                    ld l, a
+   193  004d  7c                    ld a, h
+   194  004e  65                    ld h, l
+   195  004f  e5                    push hl
+   196                              ; Start by dereferencing offset from DE
+   197  0050  eb                    ex de, hl
+   198  0051  5e                    ld e, (hl)
+   199  0052  23                    inc hl
+   200  0053  56                    ld d, (hl)
+   201  0054  23                    inc hl
+   202  0055  4e                    ld c, (hl)
+   203  0056  23                    inc hl
+   204  0057  46                    ld b, (hl)
+   205                              ; Pop the parameter H back from the stack and save the offset
+   206  0058  e3                    ex (sp), hl
+   207                              ; Syscall parameters:
+   208                              ;   H - Dev number, must refer to an opened driver (not a file)
+   209                              ;   BCDE - 32-bit offset, signed if whence is SEEK_CUR/SEEK_END.
+   210                              ;          Unsigned if SEEK_SET.
+   211                              ;   A - Whence. Can be SEEK_CUR, SEEK_END, SEEK_SET.
+   212  0059  2e00cf                syscall 6
+   213                              ; Offset address in HL
+   214  005c  e1                    pop hl
+   215                              ; If an error occurred, return directly, without modifying offset* value.
+   216  005d  b7                    or a
+   217  005e  c0                    ret nz
+   218                              ; Update the value else
+   219  005f  70                    ld (hl), b
+   220  0060  2b                    dec hl
+   221  0061  71                    ld (hl), c
+   222  0062  2b                    dec hl
+   223  0063  72                    ld (hl), d
+   224  0064  2b                    dec hl
+   225  0065  73                    ld (hl), e
+   226  0066  c9                    ret
+   227                          
+   228                          
+   229                              ; zos_err_t ioctl(zos_dev_t dev, uint8_t cmd, void* arg);
+   230                              ; Parameters:
+   231                              ;   A - dev
+   232                              ;   L - cmd
+   233                              ;   [Stack] - arg
+   234                              PUBLIC _ioctl
+   235                          _ioctl:
+   236                              ; Put the command in C before we alter HL
+   237  0067  4d                    ld c, l
+   238                              ; Get "arg" parameter out of the stack
+   239  0068  e1                    pop hl
+   240  0069  e3                    ex (sp), hl
+   241  006a  eb                    ex de, hl
+   242                              ; Syscall parameters:
+   243                              ;   H - Dev number
+   244                              ;   C - Command number
+   245                              ;   DE - 16-bit parameter. Driver dependent.
+   246  006b  67                    ld h, a
+   247  006c  2e00cf                syscall 7
+   248  006f  c9                    ret
+   249                          
+   250                          
+   251                              ; zos_err_t mkdir(const char* path);
+   252                              ; Parameter:
+   253                              ;   HL - path
+   254                              PUBLIC _mkdir
+   255                          _mkdir:
+   256                              ; Syscall parameter:
+   257                              ;   DE - Path
+   258  0070  eb                    ex de, hl
+   259  0071  2e00cf                syscall 8
+   260  0074  c9                    ret
+   261                          
+   262                          
+   263                              ; zos_err_t chdir(const char* path);
+   264                              ; Parameter:
+   265                              ;   HL - path
+   266                              PUBLIC _chdir
+   267                          _chdir:
+   268                              ; Syscall parameter:
+   269                              ;   DE - Path
+   270  0075  eb                    ex de, hl
+   271  0076  2e00cf                syscall 9
+   272  0079  c9                    ret
+   273                          
+   274                          
+   275                              ; zos_err_t curdir(char* path);
+   276                              ; Parameter:
+   277                              ;   HL - path
+   278                              PUBLIC _curdir
+   279                          _curdir:
+   280                              ; Syscall parameter:
+   281                              ;   DE - Path
+   282  007a  eb                    ex de, hl
+   283  007b  2e00cf                syscall 10
+   284  007e  c9                    ret
+   285                          
+   286                          
+   287                              ; zos_err_t opendir(const char* path);
+   288                              ; Parameter:
+   289                              ;   HL - path
+   290                              PUBLIC _opendir
+   291                          _opendir:
+   292                              ; Syscall parameter:
+   293                              ;   DE - Path
+   294  007f  eb                    ex de, hl
+   295  0080  2e00cf                syscall 11
+   296  0083  c9                    ret
+   297                          
+   298                          
+   299                              ; zos_err_t readdir(zos_dev_t dev, zos_dir_entry_t* dst);
+   300                              ; Parameters:
+   301                              ;   A - dev
+   302                              ;   DE - dst
+   303                              PUBLIC _readdir
+   304                          _readdir:
+   305                              ; Syscall parameter:
+   306                              ;   H - Opened dev number
+   307                              ;   DE - Directory entry address to fill
+   308  0084  67                    ld h, a
+   309  0085  2e00cf                syscall 12
+   310  0088  c9                    ret
+   311                          
+   312                          
+   313                              ; zos_err_t rm(const char* path);
+   314                              ; Parameter:
+   315                              ;   HL - path
+   316                              PUBLIC _rm
+   317                          _rm:
+   318                              ; Syscall parameter:
+   319                              ;   DE - Path
+   320  0089  eb                    ex de, hl
+   321  008a  2e00cf                syscall 13
+   322  008d  c9                    ret
+   323                          
+   324                          
+   325                              ; zos_err_t mount(zos_dev_t dev, char letter, zos_fs_t fs);
+   326                              ; Parameters:
+   327                              ;   A - dev
+   328                              ;   L - letter
+   329                              ;   [Stack] - fs
+   330                              PUBLIC _mount
+   331                          _mount:
+   332                              ; Save letter in B, we will need HL
+   333  008e  45                    ld b, l
+   334                              ; Pop fs number from the stack
+   335  008f  e1                    pop hl
+   336  0090  3b                    dec sp
+   337  0091  e3                    ex (sp), hl
+   338                              ; fs number in H
+   339                              ; Syscall parameters:
+   340                              ;   H - Dev number
+   341                              ;   D - Letter for the drive
+   342                              ;   E - File system
+   343  0092  5c                    ld e, h
+   344  0093  50                    ld d, b
+   345  0094  67                    ld h, a
+   346  0095  2e00cf                syscall 14
+   347  0098  c9                    ret
+   348                          
+   349                          
+   350                              ; void exit(uint8_t retval);
+   351                              ; Parameters:
+   352                              ;   A - retval
+   353                              PUBLIC _exit
+   354                              PUBLIC _zeal8bit_exit
+   355                          _exit:
+   356                          _zeal8bit_exit:
+   357  0099  e5                    push hl
+   358  009a  cd0000                call _fflush_stdout
+   359  009d  e1                    pop hl
+   360                          
+   361                              ; Return value must be put in H
+   362  009e  67                    ld h, a
+   363  009f  2e00cf                syscall 15
+   364  00a2  c9                    ret
+   365                          
+   366                              ; zos_err_t exec(zos_exec_mode_t mode, const char* name, char* argv[], uint8_t* retval) CALL_CONV;
+   367                              ; Parameters:
+   368                              ;   A - mode
+   369                              ;   DE - name
+   370                              ;   [SP + 2] - argv
+   371                              ;   [SP + 4] - retval
+   372                              PUBLIC _exec
+   373                          _exec:
+   374                              ; Syscall parameters:
+   375                              ;   BC - File to load and execute
+   376                              ;   DE - Parameter to give to the new program, only one parameter is supported
+   377                              ;        at the moment, so we need to dereference DE if it is not NULL.
+   378  00a3  42                    ld b, d
+   379  00a4  4b                    ld c, e
+   380                              ; Get the argv parameter from the stack
+   381  00a5  e1                    pop hl
+   382  00a6  e3                    ex (sp), hl
+   383  00a7  eb                    ex de, hl   ; Store the argv in DE
+   384                              ; If empty, invoke the syscall directly, keep the mode on the stack
+   385  00a8  f5                    push af
+   386  00a9  7a                    ld a, d
+   387  00aa  b3                    or e
+   388  00ab  2804                  jr z, _exec_syscall
+   389                              ; DE is not NULL, we have to dereference it
+   390  00ad  eb                    ex de, hl
+   391  00ae  5e                    ld e, (hl)
+   392  00af  23                    inc hl
+   393  00b0  56                    ld d, (hl)
+   394                          _exec_syscall:
+   395  00b1  e1                    pop hl  ; put the mode in H
+   396                              ; The sub-program may alter IX and IY! They must not be altered
+   397  00b2  dde5                  push ix
+   398  00b4  fde5                  push iy
+   399  00b6  2e10cf                syscall 16
+   400  00b9  fde1                  pop iy
+   401  00bb  dde1                  pop ix
+   402                              ; Put the retval pointer in HL
+   403  00bd  e1                    pop hl
+   404  00be  e3                    ex (sp), hl
+   405                              ; Stack is cleaned, if A shows an error, return directly
+   406  00bf  b7                    or a
+   407  00c0  c0                    ret nz
+   408                              ; A is ERR_SUCCESS, if retval pointer is NULL, return
+   409  00c1  b4                    or h
+   410  00c2  b5                    or l
+   411  00c3  c8                    ret z
+   412                              ; Else, store the return value and return success
+   413  00c4  72                    ld (hl), d
+   414  00c5  af                    xor a
+   415  00c6  c9                    ret
+   416                          
+   417                          
+   418                              ; zos_err_t dup(zos_dev_t dev, zos_dev_t ndev);
+   419                              ; Parameters:
+   420                              ;   A - dev
+   421                              ;   L - ndev
+   422                              PUBLIC _dup
+   423                          _dup:
+   424                              ; Syscall parameters:
+   425                              ;   H - Old dev number
+   426                              ;   E - New dev number
+   427  00c7  67                    ld h, a
+   428  00c8  5d                    ld e, l
+   429  00c9  2e11cf                syscall 17
+   430  00cc  c9                    ret
+   431                          
+   432                          
+   433                              ; zos_err_t msleep(uint16_t duration);
+   434                              ; Parameters:
+   435                              ;   HL - duration
+   436                              PUBLIC _msleep
+   437                          _msleep:
+   438                              ; Syscall parameters:
+   439                              ;    DE - duration
+   440  00cd  eb                    ex de, hl
+   441  00ce  2e12cf                syscall 18
+   442  00d1  c9                    ret
+   443                          
+   444                          
+   445                              ; zos_err_t settime(uint8_t id, zos_time_t* time);
+   446                              ; Parameters:
+   447                              ;   A - id
+   448                              ;   DE - time
+   449                              PUBLIC _settime
+   450                          _settime:
+   451                              ; Syscall parameters:
+   452                              ;   H - id
+   453                              ;   DE - time (v0.1.0 implementation of Zeal 8-bit OS requires
+   454                              ;        the milliseconds in DE directly, not an address)
+   455  00d2  eb                    ex de, hl
+   456  00d3  5e                    ld e, (hl)
+   457  00d4  23                    inc hl
+   458  00d5  56                    ld d, (hl)
+   459  00d6  67                    ld h, a
+   460  00d7  2e13cf                syscall 19
+   461  00da  c9                    ret
+   462                          
+   463                          
+   464                              ; zos_err_t gettime(uint8_t id, zos_time_t* time);
+   465                              ; Parameters:
+   466                              ;   A - id
+   467                              ;   DE - time
+   468                              PUBLIC _gettime
+   469                          _gettime:
+   470                              ; BC will be saved during the syscall
+   471  00db  42                    ld b, d
+   472  00dc  4b                    ld c, e
+   473                              ; Syscall parameters:
+   474                              ;   H - id
+   475                              ;   DE - time (v0.1.0 implementation of Zeal 8-bit OS requires
+   476                              ;        the milliseconds in DE directly, not an address)
+   477  00dd  67                    ld h, a
+   478  00de  2e14cf                syscall 20
+   479                              ; Syscall returns the time in DE on success.
+   480  00e1  b7                    or a
+   481  00e2  c0                    ret nz
+   482                              ; Success, we can fill the structure.
+   483  00e3  69                    ld l, c
+   484  00e4  60                    ld h, b
+   485  00e5  73                    ld (hl), e
+   486  00e6  23                    inc hl
+   487  00e7  72                    ld (hl), d
+   488  00e8  c9                    ret
+   489                          
+   490                          
+   491                              ; zos_err_t setdate(const zos_date_t* date);
+   492                              ; Parameter:
+   493                              ;   HL - date
+   494                              PUBLIC _setdate
+   495                          _setdate:
+   496                              ; Syscall parameter:
+   497                              ;   DE - Date stucture
+   498  00e9  eb                    ex de, hl
+   499  00ea  2e15cf                syscall 21
+   500  00ed  c9                    ret
+   501                          
+   502                          
+   503                              ; zos_err_t getdate(const zos_date_t* date);
+   504                              ; Parameter:
+   505                              ;   HL - date
+   506                              PUBLIC _getdate
+   507                          _getdate:
+   508                              ; Syscall parameter:
+   509                              ;   DE - Date stucture
+   510  00ee  eb                    ex de, hl
+   511  00ef  2e16cf                syscall 22
+   512  00f2  c9                    ret
+   513                          
+   514                          
+   515                              ; zos_err_t map(void* vaddr, uint32_t paddr);
+   516                              ; Parameters:
+   517                              ;   HL - vaddr
+   518                              ;   [Stack] - paddr
+   519                              PUBLIC _map
+   520                          _map:
+   521                              ; Syscall parameters:
+   522                              ;   DE - Virtual adress
+   523                              ;   HBC - Upper 24-bit of physical address
+   524  00f3  eb                    ex de, hl   ; virtual address in DE
+   525  00f4  e1                    pop hl
+   526  00f5  c1                    pop bc
+   527  00f6  e3                    ex (sp), hl
+   528  00f7  65                    ld h, l
+   529  00f8  2e17cf                syscall 23
+   530  00fb  c9                    ret
+   531                          
+   532                          
+   533                              ; zos_err_t swap(zos_dev_t dev, zos_dev_t ndev);
+   534                              ; Parameters:
+   535                              ;   A - fdev
+   536                              ;   L - sdev
+   537                              PUBLIC _swap
+   538                          _swap:
+   539                              ; Syscall parameters:
+   540                              ;   H - First dev number
+   541                              ;   E - Second dev number
+   542  00fc  67                    ld h, a
+   543  00fd  5d                    ld e, l
+   544  00fe  2e18cf                syscall 24
+   545  0101  c9                    ret
+   546                          
+   547                          
+   548                              ; int getchar(void)
+   549                              ; Get next character from standard input. Input is buffered.
+   550                              ; Returns:
+   551                              ;   DE - Character received
+   552                              PUBLIC _getchar
+   553                          _getchar:
+   554                              ; Get the size of the buffer, if it's 0, we have to call the READ syscall
+   555  0102  3a0100                ld a, (_getchar_size)
+   556  0105  b7                    or a
+   557  0106  c21b01                jp nz, _getchar_read_next
+   558                              ; Read a buffer from STDIN:
+   559                              ;   H - Opened dev
+   560                              ;   DE - Buffer source
+   561                              ;   BC - Buffer size
+   562                              ; Returns:
+   563                              ;   A - Error value
+   564                              ;   BC - Number of bytes written
+   565  0109  2601                  ld h, 1 ; DEV_STDIN
+   566  010b  110200                ld de, _getchar_buffer
+   567  010e  015000                ld bc, STD_BUFFER_SIZE
+   568  0111  2e00cf                syscall 0
+   569  0114  b7                    or a
+   570  0115  2044                  jr nz, _putchar_error
+   571                              ; Save the size in the static variable, we can ignore B, we know it's 0
+   572                              ; Put the size in A as required by the rest of the code
+   573  0117  79                    ld a, c
+   574  0118  320100                ld (_getchar_size), a
+   575                          _getchar_read_next:
+   576                              ; Before reading the character, check if we are going to reach the end of the buffer.
+   577                              ; In other words, check if Idx + 1 == A (size)
+   578  011b  210000                ld hl, _getchar_idx
+   579  011e  1600                  ld d, 0
+   580  0120  5e                    ld e, (hl)  ; Index of the buffer in DE
+   581  0121  34                    inc (hl)
+   582  0122  be                    cp (hl)
+   583                              ; If result is not 0 (likely), no need to reset the size and index
+   584  0123  2004                  jr nz, _getchar_read_next_no_reset
+   585                              ; Reset both index and size
+   586  0125  72                    ld (hl), d  ; D is 0 already
+   587  0126  23                    inc hl
+   588  0127  72                    ld (hl), d
+   589  0128  2b                    dec hl
+   590                          _getchar_read_next_no_reset:
+   591                              ; HL is pointing to the index in the buffer
+   592  0129  23                    inc hl
+   593  012a  23                    inc hl
+   594                              ; Offset of the next character to read: ADD HL, DE
+   595  012b  19                    add hl, de
+   596                              ; Character to return in E, D is already 0
+   597  012c  5e                    ld e, (hl)
+   598  012d  c9                    ret
+   599                          
+   600                          
+   601                          
+   602                              ; int _putchar(int c)
+   603                              ; Print a character on the standard output. Output is buffered.
+   604                              ; Parameters:
+   605                              ;   HL - Character to print
+   606                              ; Returns:
+   607                              ;   DE - Character printed, EOF on error
+   608                              PUBLIC _putchar
+   609                          _putchar:
+   610                              ; Store the character to print in E, ignore high byte
+   611  012e  1600                  ld d, 0
+   612  0130  5d                    ld e, l
+   613                              ; Add the character to the buffer and increment the index
+   614  0131  3a5200                ld a, (_putchar_idx)
+   615  0134  4f                    ld c, a ; Backup A
+   616  0135  215300                ld hl, _putchar_buffer
+   617                              ; ADD HL, A
+   618  0138  85                    add l
+   619  0139  6f                    ld l, a
+   620  013a  8c                    adc h
+   621  013b  95                    sub l
+   622  013c  67                    ld h, a
+   623                              ; Store the byte to print
+   624  013d  73                    ld (hl), e
+   625                              ; We have to flush the buffer if ++A is 80 OR if A is '\n'
+   626  013e  0c                    inc c
+   627  013f  79                    ld a, c
+   628  0140  325200                ld (_putchar_idx), a    ; In most cases, we won't flush
+   629                              ; BC = A
+   630  0143  0600                  ld b, 0
+   631  0145  d650                  sub STD_BUFFER_SIZE
+   632  0147  2804                  jr z, _putchar_flush
+   633                              ; Check if the character is \n
+   634  0149  7b                    ld a, e
+   635  014a  d60a                  sub '\n'
+   636                              ; Return if we have nothing to flush
+   637  014c  c0                    ret nz
+   638                          _putchar_flush:
+   639                              ; BC contains the current length of the buffer, update the index to 0 (A)
+   640  014d  325200                ld (_putchar_idx), a
+   641                              ; Write the buffer to STDOUT:
+   642                              ;   H - Opened dev
+   643                              ;   DE - Buffer source
+   644                              ;   BC - Buffer size
+   645                              ; Returns:
+   646                              ;   A - Error value
+   647                              ;   BC - Number of bytes written
+   648  0150  67                    ld h, a ; DEV_STDOUT = 0, A is 0 here
+   649  0151  d5                    push de ; Return value
+   650  0152  115300                ld de, _putchar_buffer
+   651  0155  2e01cf                syscall 1
+   652  0158  d1                    pop de
+   653                              ; Check if an error occurred
+   654  0159  b7                    or a
+   655                              ; Return directly on success
+   656  015a  c8                    ret z
+   657                          _putchar_error:
+   658                              ; Error, set DE to EOF (-1)
+   659  015b  11ffff                ld de, 0xffff
+   660  015e  c9                    ret
+   661                          
+   662                          
+   663                              ; int fflush_stdout(void);
+   664                              ; Flush stdout if its buffer is not empty.
+   665                              ; Parameters:
+   666                              ;   None
+   667                              ; Returns:
+   668                              ;   DE - 0 upon completion, EOF in case of error
+   669                              PUBLIC _fflush_stdout
+   670                          _fflush_stdout:
+   671                              ; If we have nothing in the buffer, there is nothing to flush
+   672  015f  3a5200                ld a, (_putchar_idx)
+   673  0162  b7                    or a
+   674  0163  c8                    ret z
+   675                              ; Set BC to the size of the buffer while setting A to the new index: 0
+   676  0164  4f                    ld c, a
+   677  0165  af                    xor a
+   678  0166  47                    ld b, a
+   679                              ; Return value in DE will be kept, set it to 0
+   680  0167  57                    ld d, a
+   681  0168  5f                    ld e, a
+   682  0169  18e2                  jr _putchar_flush
+   683                          
+   684                          
+   685                              SECTION _BSS
+   686                          _getchar_idx:
+   687  0000  00                    DS 1
+   688                          _getchar_size:
+   689  0001  00                    DS 1
+   690                          _getchar_buffer:
+   691  0002  0000002e01000002      DS STD_BUFFER_SIZE
+              0100000000000000  
+              0000000000000000  
+              0000000000000000  
+              0000000000010000  
+              0000000000000000  
+              0000000002000000  
+              0003000000000400  
+              0000000005000000  
+              0000000000000000  
+   692                          
+   693                          _putchar_idx:
+   694  0052  00                    DS 1
+   695                          _putchar_buffer:
+   696  0053  0000000000000006      DS STD_BUFFER_SIZE
+              0000000000000000  
+              0000000000000000  
+              0000070000000008  
+              0000000009000000  
+              000a000000000b00  
+              0000000c00000000  
+              0d00000000000000  
+              0000000e00000000  
+              5f010000000f0000  
+   697                          
