@@ -44,7 +44,6 @@ endif
 .PHONY: all clean
 
 all: clean
-	@echo "SRCS: " $(SRCS)
 	@ ( test -n "$(EXTRA_ROMDISK_FILES)" && \
 	    echo "Extra files detected: $(EXTRA_ROMDISK_FILES)" ) || \
 	    echo "No extra file to pack into romdisk"

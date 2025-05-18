@@ -520,7 +520,7 @@ help_msg_end:
 
         SECTION DATA
 system_commands_begin:
-    IF CONFIG_ENABLE_COREUTILS > 0
+    IF CONFIG_ENABLE_COREUTILS
         NEW_COMMAND("cd", cd_main)
         NEW_COMMAND("clear", clear_main)
         NEW_COMMAND("date", date_main)
