@@ -1,9 +1,15 @@
+# Before including the Makefiles, include the configuration one if it exists
+-include $(ZOS_PATH)/$(KCONFIG_CONFIG)
+
 # Final binary name
 BIN=init.bin
 # Source files to assemble
-SRCS=init.asm parse.asm  cat.asm ls.asm less.asm opt.asm mkdir.asm cd.asm rm.asm \
-	 errors.asm uart.asm date.asm cp.asm misc.asm hexdump.asm \
-	 sleep.asm expr.asm echo.asm xfer.asm
+
+# shell core
+SRCS=init.asm parse.asm opt.asm errors.asm uart.asm date.asm misc.asm
+# shell commands that always exist
+SRCS += cd.asm sleep.asm expr.asm
+
 # Output directory to place binaries in
 BUILDIR=build
 
@@ -11,6 +17,8 @@ BUILDIR=build
 IMG=disk.img
 # Files to pack inside the image file
 FILES_IN_IMG=$(BUILDIR)/$(BIN) simple.txt
+EXTRA_ROMDISK_FILES := $(wildcard $(EXTRA_ROMDISK_FILES))
+
 
 # If z88dk has been install through snap, the binary may be prefixed with "z88dk"
 # So choose any of z88dk-* or z88dk.z88dk-*, as long as one exists
@@ -24,10 +32,25 @@ LIBS=-L$(ZOS_PATH)/kernel_headers/z88dk-z80asm/lib
 ASMFLAGS=$(INCLUDES) $(LIBS) -lstrutils.lib -m -b
 
 
+ifdef CONFIG_INITBIN_ENABLE_COREUTILS
+	ASMFLAGS += -DCONFIG_ENABLE_COREUTILS=1
+else
+	SRCS += cat.asm ls.asm less.asm mkdir.asm rm.asm \
+		cp.asm hexdump.asm \
+		echo.asm xfer.asm
+endif
+
+
 .PHONY: all clean
 
 all: clean
+	@echo "SRCS: " $(SRCS)
+	@ ( test -n "$(EXTRA_ROMDISK_FILES)" && \
+	    echo "Extra files detected: $(EXTRA_ROMDISK_FILES)" ) || \
+	    echo "No extra file to pack into romdisk"
 	@mkdir -p $(BUILDIR)
+	@echo "CONFIG_ENABLE_COREUTILS=$(CONFIG_INITBIN_ENABLE_COREUTILS)"
+	@echo "Creating romdisk"
 	$(CC) $(ASMFLAGS) $(SRCS)
 	@echo "Moving generated files"
 	mv *.o ./$(BUILDIR) && mv *.map ./$(BUILDIR) && mv $(basename $(BIN))*.bin ./$(BUILDIR)
