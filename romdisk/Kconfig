@@ -1,0 +1,12 @@
+menu "Zeal Shell (init.bin)"
+
+        config INITBIN_ENABLE_COREUTILS
+                bool
+                prompt "Enable zeal-coreutils"
+                default n
+                help
+                        Boolean to mark whether the target has an MMU/Memory Mapper. If this option is selected,
+                        the target needs to have a memory mapping organized as 4 pages of 16KB. Each page can be
+                        mapped to any 16KB of physical address space.
+                        As such, when enabled, the target must implement an `mmu_h.asm` interface.
+endmenu
