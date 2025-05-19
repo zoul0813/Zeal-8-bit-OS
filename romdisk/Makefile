@@ -9,6 +9,10 @@ BIN=init.bin
 SRCS=init.asm parse.asm opt.asm errors.asm uart.asm date.asm misc.asm
 # shell commands that always exist
 SRCS += cd.asm sleep.asm expr.asm
+# extras, coreutils will eventually support these
+# ls_main used by dir
+SRCS += less.asm xfer.asm ls.asm
+
 
 # Output directory to place binaries in
 BUILDIR=build
@@ -35,9 +39,7 @@ ASMFLAGS=$(INCLUDES) $(LIBS) -lstrutils.lib -m -b
 ifdef CONFIG_INITBIN_ENABLE_COREUTILS
 	ASMFLAGS += -DCONFIG_ENABLE_COREUTILS=1
 else
-	SRCS += cat.asm ls.asm less.asm mkdir.asm rm.asm \
-		cp.asm hexdump.asm \
-		echo.asm xfer.asm
+	SRCS += cat.asm mkdir.asm rm.asm cp.asm hexdump.asm echo.asm
 endif
 
 
