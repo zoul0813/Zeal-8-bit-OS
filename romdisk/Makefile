@@ -1,5 +1,5 @@
 # Before including the Makefiles, include the configuration one if it exists
--include $(ZOS_PATH)/$(KCONFIG_CONFIG)
+-include $(KCONFIG_CONFIG)
 
 # Final binary name
 BIN=init.bin
@@ -20,7 +20,16 @@ BUILDIR=build
 # Name of the image file to make
 IMG=disk.img
 # Files to pack inside the image file
-FILES_IN_IMG=$(BUILDIR)/$(BIN) simple.txt
+FILES_IN_IMG=
+
+ifdef CONFIG_ROMDISK_INCLUDE_INIT_BIN
+    FILES_IN_IMG += $(BUILDIR)/$(BIN)
+endif
+
+ifdef CONFIG_ROMDISK_INCLUDE_SIMPLE_TXT
+    FILES_IN_IMG += simple.txt
+endif
+
 EXTRA_ROMDISK_FILES := $(wildcard $(EXTRA_ROMDISK_FILES))
 
 
@@ -46,11 +55,7 @@ endif
 .PHONY: all clean
 
 all: clean
-	@ ( test -n "$(EXTRA_ROMDISK_FILES)" && \
-	    echo "Extra files detected: $(EXTRA_ROMDISK_FILES)" ) || \
-	    echo "No extra file to pack into romdisk"
 	@mkdir -p $(BUILDIR)
-	@echo "CONFIG_ENABLE_COREUTILS=$(CONFIG_INITBIN_ENABLE_COREUTILS)"
 	@echo "Creating romdisk"
 	$(CC) $(ASMFLAGS) $(SRCS)
 	@echo "Moving generated files"
@@ -59,8 +64,7 @@ all: clean
 	@rm -f $(BUILDIR)/$(BIN) && mv $(BUILDIR)/*_TEXT.bin $(BUILDIR)/$(BIN)
 
 with_image: all
-	@echo "Packing the files"
-	${ZOS_PATH}/tools/pack.py ${IMG} ${FILES_IN_IMG} ${EXTRA_ROMDISK_FILES}
+	${ZOS_PATH}/tools/pack.py ${IMG} ${FILES_IN_IMG}
 
 clean:
 	rm -rf build/ $(IMG)
