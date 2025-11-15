@@ -524,7 +524,6 @@ system_commands_begin:
         NEW_COMMAND("cd", cd_main)
         NEW_COMMAND("clear", clear_main)
         NEW_COMMAND("date", date_main)
-        NEW_COMMAND("dir", ls_main)
         NEW_COMMAND("exec", exec_main)
         NEW_COMMAND("expr", expr_main)
         NEW_COMMAND("help", help_main)
